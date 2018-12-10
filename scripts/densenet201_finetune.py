@@ -5,6 +5,7 @@ from keras.optimizers import SGD, Adam
 from keras.layers import GlobalAveragePooling2D, Flatten, Dropout, Dense
 from keras.models import Sequential
 from keras.callbacks import EarlyStopping
+import math
 import PIL
 from PIL import Image
 import numpy as np
@@ -14,6 +15,8 @@ import sys
 train_images_list_file = sys.argv[1]
 datadir = sys.argv[2]
 outdir = sys.argv[3]
+model_file = sys.argv[4]
+stats_file = sys.argv[5]
 
 list_train_images = []
 train_labels = []
@@ -45,9 +48,13 @@ std_train = np.std(X_train)
 X_train -= mean_train
 X_train /= std_train
 
+with open(stats_file, 'w') as out_file:
+    out_file.write(str(mean_train) + "\n")
+    out_file.write(str(std_train) + "\n")
+
 base_model = DenseNet201(weights='imagenet', include_top=False, input_shape=(224,224,3))
 
-# this is the model we will train
+# Top model that will be learned from scratch
 model = Sequential()
 model.add(base_model)
 model.add(Flatten(input_shape=base_model.output_shape[1:]))
@@ -55,31 +62,27 @@ model.add(Dense(128, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(1, activation='sigmoid'))
 
-# first: train only the top layers (which were randomly initialized)
-# i.e. freeze all convolutional layers
+# We first train only the top layers after freezing all convolutional layers
 for layer in base_model.layers:
     layer.trainable = False
 
-# compile the model (should be done *after* setting layers to non-trainable)
+# Compile the model (should be done *after* setting layers to non-trainable)
 model.compile(optimizer=Adam(lr=0.00005), loss='binary_crossentropy', metrics=['accuracy'])
 early_stopping = EarlyStopping(monitor='val_acc', patience=5)
 model.fit(X_train, y_train, epochs=20, validation_split=0.1, shuffle=True, callbacks=[early_stopping])
 
-# we chose to train the top 2 inception blocks, i.e. we will freeze
-# the first 199 layers and unfreeze the rest:
+# Train the top 2 inception blocks (first 172 layers are frozen)
 for layer in model.layers[:199]:
    layer.trainable = False
 for layer in model.layers[199:]:
    layer.trainable = True
 
-# we need to recompile the model for these modifications to take effect
-# we use SGD with a low learning rate
+# Recompile model
 model.compile(optimizer=Adam(lr=0.0001), loss='binary_crossentropy', metrics=['accuracy'])
 
-# we train our model again (this time fine-tuning the top 2 inception blocks
-# alongside the top Dense layers
+# Train the model again (top 2 inception and top Dense layers)
 model.fit(X_train,y_train, epochs=20, validation_split=0.1, shuffle=True, callbacks=[early_stopping])
 
-#SAVE MODEL HERE!!!
-model.save('densenet201_vehicles_animals.h5')
+# Save model
+model.save(model_file)
 

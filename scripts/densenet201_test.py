@@ -1,4 +1,4 @@
-from keras.applications.resnet50 import preprocess_input
+from keras.applications.densenet import preprocess_input
 from keras.preprocessing import image
 from keras.models import load_model
 import PIL

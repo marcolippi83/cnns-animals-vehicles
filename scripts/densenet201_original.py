@@ -1,6 +1,6 @@
 from keras.applications.densenet import DenseNet201
 from keras.preprocessing import image
-from keras.applications.resnet50 import preprocess_input, decode_predictions
+from keras.applications.densenet import preprocess_input, decode_predictions
 import numpy as np
 import os
 import sys
